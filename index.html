@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bò 888 - Cloud CRM System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [v-cloak] { display: none; }
+        .rotate-3 { transform: rotate(3deg); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        
+        <!-- MÀN HÌNH ĐĂNG NHẬP -->
+        <transition name="fade">
+            <div v-if="!isAuthorized" class="fixed inset-0 bg-red-800 z-[300] flex flex-col items-center justify-center p-6 text-white">
+                <div class="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl mb-8 rotate-3 transition-transform hover:rotate-0 duration-500">
+                    <span class="text-red-800 font-black text-4xl">888</span>
+                </div>
+                <div class="text-center mb-10">
+                    <h2 class="text-3xl font-black uppercase tracking-tighter mb-2">Hệ thống CRM Bò 888</h2>
+                    <p class="text-red-100 opacity-70 font-medium">Vui lòng nhập mật khẩu để truy cập dữ liệu</p>
+                </div>
+                
+                <form @submit.prevent="checkLogin" class="w-full max-w-sm space-y-6">
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-5 top-1/2 -translate-y-1/2 text-red-800 w-6 h-6"></i>
+                        <input v-model="loginPassword" type="password" placeholder="Mật khẩu truy cập" class="w-full pl-14 pr-6 py-5 rounded-3xl bg-white text-slate-900 text-xl font-black focus:ring-4 focus:ring-red-400 focus:outline-none transition-all placeholder:text-slate-300 placeholder:font-normal">
+                    </div>
+                    <button type="submit" class="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg uppercase tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95">
+                        Vào hệ thống
+                    </button>
+                    <p v-if="loginError" class="text-center text-red-200 font-bold animate-bounce mt-4">
+                        <i data-lucide="x-circle" class="inline w-4 h-4 mr-1"></i> Mật khẩu không chính xác!
+                    </p>
+                </form>
+                
+                <p class="mt-auto opacity-40 text-[10px] font-black uppercase tracking-widest">Bò 888 Proprietary System</p>
+            </div>
+        </transition>
+
+        <!-- Offline Banner -->
+        <div v-if="!isOnline && isAuthorized" class="bg-orange-500 text-white text-center py-2 px-4 text-xs font-bold flex items-center justify-center gap-2 animate-pulse z-[100]">
+            <i data-lucide="wifi-off" class="w-4 h-4"></i> BẠN ĐANG NGOẠI TUYẾN. DỮ LIỆU SẼ ĐƯỢC ĐỒNG BỘ KHI CÓ MẠNG TRỞ LẠI.
+        </div>
+
+        <!-- Màn hình Loading -->
+        <div v-if="loading && isAuthorized" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center gap-6">
+            <div class="relative">
+                <div class="w-20 h-20 border-8 border-slate-100 rounded-full"></div>
+                <div class="w-20 h-20 border-8 border-red-800 border-t-transparent rounded-full animate-spin absolute top-0"></div>
+            </div>
+            <div class="text-center">
+                <p class="font-black text-red-800 uppercase tracking-[0.3em] text-xl mb-2">BÒ 888 CLOUD</p>
+                <p class="text-slate-400 font-bold animate-pulse text-sm uppercase tracking-widest">Đang kết nối dữ liệu...</p>
+            </div>
+        </div>
+
+        <div v-if="isAuthorized" class="flex flex-1 overflow-hidden">
+            <!-- Sidebar -->
+            <aside class="hidden md:flex flex-col w-64 bg-red-800 text-white p-4 sticky top-0 shadow-2xl z-40 overflow-y-auto">
+                <div class="flex items-center gap-3 mb-10 px-2 mt-4">
+                    <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
+                        <span class="text-red-800 font-black text-2xl">888</span>
+                    </div>
+                    <h1 class="text-xl font-black tracking-tighter uppercase leading-none">Bò 888<br/><span class="text-[10px] opacity-60 font-bold tracking-normal">Cloud CRM v3</span></h1>
+                </div>
+
+                <nav class="space-y-4">
+                    <button @click="activeTab = 'list'" :class="activeTab === 'list' ? 'bg-white text-red-800 shadow-xl scale-105' : 'hover:bg-red-700/50'" class="w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-left">
+                        <i data-lucide="users" class="w-5 h-5"></i> Danh sách khách
+                    </button>
+                    <button @click="openAddTab" :class="activeTab === 'add' ? 'bg-white text-red-800 shadow-xl scale-105' : 'hover:bg-red-700/50'" class="w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-left">
+                        <i data-lucide="user-plus" class="w-5 h-5"></i> Thêm khách mới
+                    </button>
+                    <button @click="activeTab = 'transaction'" :class="activeTab === 'transaction' ? 'bg-white text-red-800 shadow-xl scale-105' : 'hover:bg-red-700/50'" class="w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-left">
+                        <i data-lucide="credit-card" class="w-5 h-5"></i> Thanh toán bill
+                    </button>
+                </nav>
+
+                <div class="mt-auto pt-6 space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="exportToCSV" class="flex flex-col items-center justify-center gap-1 p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 transition-all font-bold text-white shadow-lg text-[10px] uppercase">
+                            <i data-lucide="download" class="w-4 h-4"></i> Xuất
+                        </button>
+                        <button @click="$refs.fileInput.click()" class="flex flex-col items-center justify-center gap-1 p-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-all font-bold text-white shadow-lg text-[10px] uppercase">
+                            <i data-lucide="upload" class="w-4 h-4"></i> Nhập
+                        </button>
+                        <input type="file" ref="fileInput" class="hidden" accept=".csv" @change="handleImportCSV">
+                    </div>
+
+                    <button @click="logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-black/20 hover:bg-black/40 transition-all font-bold text-[11px] uppercase tracking-widest">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> Đăng xuất / Khóa app
+                    </button>
+
+                    <div class="px-4 py-4 bg-black/20 rounded-2xl border border-white/10 backdrop-blur-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] font-black uppercase tracking-widest opacity-60">Dữ liệu Cloud</span>
+                            <i :data-lucide="isOnline ? 'wifi' : 'wifi-off'" :class="isOnline ? 'text-green-400' : 'text-orange-400'" class="w-4 h-4"></i>
+                        </div>
+                        <p class="text-[10px] font-bold leading-tight opacity-70 truncate">ID: {{ appId }}</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 relative">
+                
+                <!-- Notification -->
+                <transition name="fade">
+                    <div v-if="notification" class="fixed top-6 right-6 z-[200] p-4 rounded-2xl shadow-2xl flex items-center gap-4 bg-slate-900 text-white border-l-8" :class="notification.type === 'success' ? 'border-emerald-500' : 'border-red-500'">
+                        <div class="p-1.5 rounded-xl bg-white/10 text-white">
+                            <i :data-lucide="notification.type === 'success' ? 'check-circle' : 'alert-triangle'" class="w-6 h-6"></i>
+                        </div>
+                        <p class="font-black text-sm uppercase tracking-tight pr-4">{{ notification.msg }}</p>
+                    </div>
+                </transition>
+
+                <!-- Tab: Danh sách -->
+                <div v-if="activeTab === 'list'" class="space-y-8">
+                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <h2 class="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Thành viên <span class="text-red-800">Bò 888</span></h2>
+                            <p class="text-slate-500 font-bold mt-2 flex items-center gap-2 text-sm">
+                                <i data-lucide="database" class="w-4 h-4"></i> Tổng số: {{ members.length }} khách hàng
+                            </p>
+                        </div>
+                        <div class="relative w-full md:w-96 group">
+                            <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-red-800 transition-colors"></i>
+                            <input v-model="searchTerm" type="text" placeholder="Tìm theo tên hoặc SĐT..." class="w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-3xl focus:ring-4 focus:ring-red-100 focus:border-red-800 focus:outline-none bg-white shadow-sm transition-all font-bold">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-10">
+                        <div v-for="member in filteredMembers" :key="member.id" class="bg-white p-8 rounded-[2.5rem] border-2 shadow-sm hover:shadow-2xl transition-all relative overflow-hidden flex flex-col min-h-[380px]" :class="[getTierConfig(member.spendingLast30Days).border, member.isPending ? 'opacity-80' : '']">
+                            <div v-if="member.isPending" class="absolute top-0 right-0 p-3 text-[9px] bg-orange-100 text-orange-600 font-black rounded-bl-2xl uppercase tracking-tighter flex items-center gap-1 z-10">
+                                <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> Chờ đồng bộ...
+                            </div>
+                            
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 class="font-black text-2xl text-slate-800 tracking-tight leading-none mb-2">{{ member.name }}</h3>
+                                    <p class="text-slate-400 font-black text-sm">{{ member.phone }}</p>
+                                </div>
+                                <span :class="getTierConfig(member.spendingLast30Days).color" class="px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                    {{ getTierConfig(member.spendingLast30Days).name }}
+                                </span>
+                            </div>
+
+                            <div class="space-y-3 mb-6 flex-1">
+                                <div :class="getDaysSinceLastVisit(member.lastVisitDate) > 30 ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-emerald-50 text-emerald-700'" class="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-tight">
+                                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                                    {{ getDaysSinceLastVisit(member.lastVisitDate) === 0 ? 'Ghé hôm nay' : `${getDaysSinceLastVisit(member.lastVisitDate)} ngày chưa ghé` }}
+                                </div>
+                                <div :class="getDaysRemaining(member.lastResetDate) <= 3 ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-700'" class="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-tight">
+                                    <i data-lucide="timer" class="w-4 h-4"></i>
+                                    Còn {{ getDaysRemaining(member.lastResetDate) }} ngày chu kỳ
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <div class="bg-slate-50 p-4 rounded-[1.5rem] border border-slate-100 shadow-inner">
+                                    <p class="text-[10px] uppercase text-slate-400 font-black mb-1">Ví Điểm</p>
+                                    <p class="text-red-700 font-black text-2xl leading-none">{{ formatCurrency(member.points) }}đ</p>
+                                </div>
+                                <div class="bg-slate-50 p-4 rounded-[1.5rem] border border-slate-100 shadow-inner">
+                                    <p class="text-[10px] uppercase text-slate-400 font-black mb-1 tracking-tighter">Tiêu 30 ngày</p>
+                                    <p class="text-slate-800 font-black text-2xl leading-none">{{ Math.floor(member.spendingLast30Days / 1000) }}K</p>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-center pt-6 border-t border-slate-100 mt-auto">
+                                <button @click="showDetail(member)" class="flex items-center gap-2 text-xs font-black text-slate-500 hover:text-red-800 transition uppercase tracking-widest">
+                                    <i data-lucide="history" class="w-4 h-4"></i> Chi tiết
+                                </button>
+                                <div class="flex gap-2">
+                                    <button @click="editMember(member)" class="p-3 hover:bg-blue-50 rounded-2xl text-blue-600 transition shadow-sm bg-white border border-slate-100" title="Sửa">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click="deleteConfirmation = member" class="p-3 hover:bg-red-50 rounded-2xl text-red-600 transition shadow-sm bg-white border border-slate-100" title="Xóa">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Đăng ký / Sửa -->
+                <div v-if="activeTab === 'add'" class="max-w-xl mx-auto bg-white p-12 rounded-[3.5rem] shadow-sm border border-slate-100 animate-in slide-in-from-bottom-10">
+                    <div class="w-20 h-20 bg-red-100 text-red-800 rounded-[2rem] flex items-center justify-center mb-8 mx-auto shadow-inner rotate-3">
+                        <i data-lucide="user-plus" class="w-10 h-10"></i>
+                    </div>
+                    <h2 class="text-3xl font-black mb-10 text-center text-slate-800 uppercase tracking-tighter leading-none">{{ editingMember ? 'Sửa thông tin khách' : 'Đăng ký khách mới' }}</h2>
+                    <form @submit.prevent="handleSubmitMember" class="space-y-8">
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase ml-2 tracking-[0.2em]">Họ và tên thành viên</label>
+                            <input v-model="formData.name" required type="text" class="w-full px-6 py-5 rounded-3xl border-2 border-slate-100 focus:border-red-800 focus:ring-4 focus:ring-red-50 focus:outline-none font-bold text-lg transition-all">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase ml-2 tracking-[0.2em]">Số điện thoại</label>
+                            <input v-model="formData.phone" required type="tel" class="w-full px-6 py-5 rounded-3xl border-2 border-slate-100 focus:border-red-800 focus:ring-4 focus:ring-red-50 focus:outline-none font-bold text-lg transition-all">
+                        </div>
+                        <div class="flex gap-4 pt-6">
+                            <button type="button" @click="activeTab = 'list'" class="flex-1 py-5 border-2 border-slate-100 rounded-3xl hover:bg-slate-50 transition font-black text-slate-500 uppercase tracking-widest text-xs">Hủy bỏ</button>
+                            <button type="submit" class="flex-1 py-5 bg-red-800 text-white rounded-3xl hover:bg-red-700 transition shadow-2xl shadow-red-200 font-black uppercase tracking-widest text-xs">{{ editingMember ? 'Lưu thay đổi' : 'Xác nhận' }}</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab: Thanh toán -->
+                <div v-if="activeTab === 'transaction'" class="max-w-3xl mx-auto pb-10">
+                    <div class="bg-white p-12 rounded-[4rem] shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-5 mb-10">
+                            <div class="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-[1.5rem] flex items-center justify-center shadow-inner rotate-3">
+                                <i data-lucide="dollar-sign" class="w-7 h-7"></i>
+                            </div>
+                            <h2 class="text-3xl font-black text-slate-800 uppercase tracking-tighter text-emerald-700">Thanh toán & Tích điểm</h2>
+                        </div>
+                        
+                        <div class="mb-10">
+                            <label class="block text-[10px] font-black text-slate-400 uppercase mb-4 ml-2 tracking-[0.2em]">Tìm khách hàng thanh toán</label>
+                            <input v-model="searchTerm" type="text" placeholder="Gõ tên hoặc SĐT khách..." class="w-full px-6 py-5 border-2 border-slate-100 rounded-3xl focus:border-red-800 focus:outline-none font-bold text-lg transition-all bg-slate-50/30">
+                            
+                            <div class="mt-6 max-h-64 overflow-y-auto border-2 border-slate-50 rounded-[2.5rem] divide-y bg-slate-50/20 shadow-inner scrollbar-hide">
+                                <button v-for="m in filteredMembers" :key="m.id" @click="selectedMember = m" :class="selectedMember?.id === m.id ? 'bg-white border-4 border-red-800/10 shadow-xl scale-[1.02] z-10' : ''" class="w-full p-6 text-left flex justify-between items-center hover:bg-white transition-all">
+                                    <div>
+                                        <div class="font-black text-slate-800 text-lg leading-none mb-1">{{ m.name }}</div>
+                                        <div class="text-xs text-slate-400 font-black tracking-widest">{{ m.phone }}</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[10px] font-black px-3 py-1 rounded-xl bg-slate-200 uppercase text-slate-600 tracking-tighter mb-1 inline-block">{{ getTierConfig(m.spendingLast30Days).name }}</div>
+                                        <div class="text-lg text-red-600 font-black">{{ formatCurrency(m.points) }}đ</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <form v-if="selectedMember" @submit.prevent="handleTransaction" class="space-y-10 animate-in fade-in zoom-in-95">
+                            <div class="p-10 bg-slate-900 rounded-[3.5rem] space-y-8 text-white shadow-2xl relative overflow-hidden border-4 border-slate-800">
+                                <div class="flex justify-between items-center border-b border-white/10 pb-8 relative z-10">
+                                    <span class="font-black text-slate-500 uppercase text-[11px] tracking-[0.3em]">Tổng hóa đơn (Bill)</span>
+                                    <div class="relative">
+                                        <input v-model="billAmount" required type="number" class="text-right text-5xl font-black bg-transparent border-b-4 border-red-600 w-64 focus:outline-none pr-3 text-white">
+                                        <span class="absolute -right-3 bottom-1 text-[11px] font-black text-red-600 uppercase">vnđ</span>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between items-center py-4 relative z-10">
+                                    <div class="flex items-center gap-5">
+                                        <input type="checkbox" id="usePoints" v-model="usePoints" class="peer hidden" :disabled="!selectedMember.points || selectedMember.points <= 0">
+                                        <label for="usePoints" class="w-10 h-10 border-2 border-white/20 rounded-2xl peer-checked:bg-red-600 peer-checked:border-red-600 flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-90">
+                                            <i v-if="usePoints" data-lucide="check" class="w-6 h-6 text-white font-black"></i>
+                                        </label>
+                                        <label for="usePoints" class="text-sm font-black text-slate-400 cursor-pointer select-none uppercase tracking-widest">Khấu trừ điểm tích lũy ({{ formatCurrency(selectedMember.points) }}đ)</label>
+                                    </div>
+                                    <span v-if="usePoints" class="text-red-400 font-black text-2xl">-{{ formatCurrency(Math.min(selectedMember.points, billAmount || 0)) }}đ</span>
+                                </div>
+                                <div class="flex justify-between items-center pt-8 border-t border-white/10 relative z-10">
+                                    <span class="text-slate-500 font-black uppercase text-[11px] tracking-[0.3em]">Thực thu tiền mặt</span>
+                                    <span class="text-red-600 text-5xl font-black tracking-tighter">{{ formatCurrency(Math.max(0, (billAmount || 0) - (usePoints ? selectedMember.points : 0))) }}đ</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full py-6 bg-red-800 text-white rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-red-200 hover:bg-red-700 transition-all uppercase tracking-[0.2em] transform hover:scale-[1.02]">Xác nhận thanh toán</button>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- OVERLAY MODALS -->
+        <transition name="fade">
+            <div v-if="showDetailModal || deleteConfirmation" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl">
+                
+                <!-- Modal: Xác nhận xóa -->
+                <div v-if="deleteConfirmation" class="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 border border-white/20 text-center animate-in zoom-in-95">
+                    <div class="w-20 h-20 bg-red-100 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 rotate-6">
+                        <i data-lucide="alert-triangle" class="w-10 h-10"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-slate-800 mb-4 uppercase tracking-tighter text-red-600 leading-none">Xóa vĩnh viễn?</h3>
+                    <p class="text-slate-500 text-sm mb-10 leading-relaxed font-bold">Mọi dữ liệu của khách hàng <span class="text-red-800">{{ deleteConfirmation.name }}</span> sẽ biến mất.</p>
+                    <div class="flex flex-col gap-3">
+                        <button @click="confirmDelete" class="w-full py-5 bg-red-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-red-700 shadow-xl shadow-red-200">Xác nhận xóa</button>
+                        <button @click="deleteConfirmation = null" class="w-full py-4 bg-slate-100 text-slate-600 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-slate-200">Quay lại</button>
+                    </div>
+                </div>
+
+                <!-- Modal: Chi tiết & Nhật ký -->
+                <div v-if="showDetailModal" class="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/20 animate-in zoom-in-95">
+                    <div class="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                        <div class="flex items-center gap-6">
+                            <div class="w-20 h-20 bg-red-800 text-white rounded-[2rem] flex items-center justify-center font-black text-3xl shadow-2xl shadow-red-200 rotate-6">
+                                {{ showDetailModal.name?.charAt(0) }}
+                            </div>
+                            <div>
+                                <h2 class="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none mb-2">{{ showDetailModal.name }}</h2>
+                                <div class="flex items-center gap-3">
+                                    <span :class="getTierConfig(showDetailModal.spendingLast30Days).color" class="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest">{{ getTierConfig(showDetailModal.spendingLast30Days).name }}</span>
+                                    <p class="text-sm text-slate-500 font-black tracking-tight">{{ showDetailModal.phone }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button @click="showDetailModal = null" class="p-4 hover:bg-slate-200 rounded-full transition text-slate-400">
+                            <i data-lucide="x" class="w-8 h-8"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-2 gap-12 text-slate-900">
+                        <div class="space-y-8">
+                            <div class="bg-red-50/30 p-8 rounded-[2.5rem] border-2 border-red-100/50 shadow-inner">
+                                <h3 class="font-black text-red-800 mb-6 flex items-center gap-3 uppercase tracking-widest text-sm">
+                                    <i data-lucide="settings" class="w-5 h-5"></i> Quản lý điểm
+                                </h3>
+                                <form @submit.prevent="handleAdjustPoints" class="space-y-6">
+                                    <input v-model="adjustPointsValue" type="number" required placeholder="VNĐ (vd: 50000 hoặc -10000)" class="w-full px-6 py-5 rounded-3xl border-2 border-red-100 focus:border-red-500 font-black text-2xl outline-none transition-all">
+                                    <textarea v-model="adjustPointsReason" class="w-full px-6 py-4 rounded-3xl border-2 border-red-100 text-sm font-bold min-h-[120px] outline-none transition-all" placeholder="Lý do điều chỉnh (Vd: Tặng bù khách...)"></textarea>
+                                    <button class="w-full py-5 bg-red-800 text-white rounded-[1.8rem] font-black uppercase text-sm shadow-lg hover:bg-red-700 transition-colors">Lưu thay đổi Cloud</button>
+                                </form>
+                            </div>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div class="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-inner text-center">
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Tổng chi tiêu</p>
+                                    <p class="text-xl font-black text-slate-800">{{ formatCurrency(showDetailModal.totalSpending) }}đ</p>
+                                </div>
+                                <div class="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-inner text-center text-xs">
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Ngày tham gia</p>
+                                    <p class="font-bold text-slate-800">{{ formatDateShort(showDetailModal.joinDate) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col h-full">
+                            <h3 class="font-black text-slate-800 mb-6 flex items-center gap-3 uppercase text-sm">
+                                <i data-lucide="file-text" class="w-5 h-5"></i> Nhật ký hoạt động
+                            </h3>
+                            <div class="flex-1 bg-slate-50 rounded-[2.5rem] p-6 overflow-y-auto space-y-4 shadow-inner scrollbar-hide min-h-[400px]">
+                                <div v-for="(log, idx) in sortedHistory" :key="idx" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                                    <div class="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-1">
+                                        <span :class="getLogColor(log.type)">{{ log.type }}</span>
+                                        <span>{{ formatDateShort(log.date) }}</span>
+                                    </div>
+                                    <p class="text-slate-700 font-bold text-sm leading-tight">{{ log.description }}</p>
+                                    <p v-if="log.amount !== 0" :class="log.amount > 0 ? 'text-emerald-600' : 'text-red-600'" class="font-black mt-2">
+                                        {{ log.amount > 0 ? '+' : '' }}{{ formatCurrency(log.amount) }}đ
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+        // --- CẤU HÌNH FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnQtUo1Nxq3YDxXp_2P4L1Beqv5JHAYPE",
+            authDomain: "crm-bo-888.firebaseapp.com",
+            projectId: "crm-bo-888",
+            storageBucket: "crm-bo-888.firebasestorage.app",
+            messagingSenderId: "1012577969287",
+            appId: "bo-888-chinh-chu"
+        };
+
+        const appInstance = initializeApp(firebaseConfig);
+        const auth = getAuth(appInstance);
+        const db = getFirestore(appInstance);
+        const appId = 'crm-bo-888-v2';
+        const MASTER_PASSWORD = '8888'; // <--- BẠN CÓ THỂ ĐỔI MẬT KHẨU TẠI ĐÂY
+        const CYCLE_DAYS = 30;
+
+        // Offline mode
+        enableIndexedDbPersistence(db).catch(() => {});
+
+        createApp({
+            setup() {
+                // Auth States
+                const isAuthorized = ref(sessionStorage.getItem('bo888_auth') === 'true');
+                const loginPassword = ref('');
+                const loginError = ref(false);
+
+                const user = ref(null);
+                const members = ref([]);
+                const loading = ref(true);
+                const isOnline = ref(navigator.onLine);
+                const activeTab = ref('list');
+                const searchTerm = ref('');
+                
+                const editingMember = ref(null);
+                const selectedMember = ref(null);
+                const showDetailModal = ref(null);
+                const deleteConfirmation = ref(null);
+                const notification = ref(null);
+
+                const formData = ref({ name: '', phone: '' });
+                const billAmount = ref(null);
+                const usePoints = ref(false);
+                const adjustPointsValue = ref(null);
+                const adjustPointsReason = ref('');
+
+                const notify = (msg, type = 'success') => {
+                    notification.value = { msg, type };
+                    setTimeout(() => notification.value = null, 3500);
+                };
+
+                const checkLogin = () => {
+                    if (loginPassword.value === MASTER_PASSWORD) {
+                        isAuthorized.value = true;
+                        sessionStorage.setItem('bo888_auth', 'true');
+                        loginError.value = false;
+                        nextTick(() => lucide.createIcons());
+                    } else {
+                        loginError.value = true;
+                        loginPassword.value = '';
+                        setTimeout(() => loginError.value = false, 3000);
+                    }
+                };
+
+                const logout = () => {
+                    isAuthorized.value = false;
+                    sessionStorage.removeItem('bo888_auth');
+                    loginPassword.value = '';
+                    nextTick(() => lucide.createIcons());
+                };
+
+                const formatCurrency = (val) => (val || 0).toLocaleString('vi-VN');
+                const formatDateShort = (iso) => iso ? new Date(iso).toLocaleDateString('vi-VN') + ' ' + new Date(iso).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '---';
+
+                const getTierConfig = (spending) => {
+                    const TIERS = {
+                        NEW: { name: 'Mới', threshold: 0, cashback: 0.01, color: 'bg-slate-100 text-slate-700', border: 'border-slate-200' },
+                        SILVER: { name: 'Bạc', threshold: 700000, cashback: 0.02, color: 'bg-slate-50 text-gray-800', border: 'border-gray-300' },
+                        GOLD: { name: 'Vàng', threshold: 7000000, cashback: 0.03, color: 'bg-yellow-50 text-yellow-800', border: 'border-yellow-400' },
+                        DIAMOND: { name: 'Kim cương', threshold: 15000000, cashback: 0.05, color: 'bg-blue-50 text-blue-800', border: 'border-blue-400' }
+                    };
+                    if (spending >= TIERS.DIAMOND.threshold) return TIERS.DIAMOND;
+                    if (spending >= TIERS.GOLD.threshold) return TIERS.GOLD;
+                    if (spending >= TIERS.SILVER.threshold) return TIERS.SILVER;
+                    return TIERS.NEW;
+                };
+
+                const getDaysSinceLastVisit = (date) => {
+                    if (!date) return 0;
+                    const diff = Math.floor((new Date() - new Date(date)) / (1000 * 60 * 60 * 24));
+                    return Math.max(0, diff);
+                };
+
+                const getDaysRemaining = (date) => {
+                    const expiry = new Date(new Date(date).getTime() + CYCLE_DAYS * 24 * 60 * 60 * 1000);
+                    const diff = Math.ceil((expiry - new Date()) / (1000 * 60 * 60 * 24));
+                    return Math.max(0, diff);
+                };
+
+                const getLogColor = (type) => {
+                    if (type.includes('EARN') || type === 'IMPORT') return 'text-emerald-500';
+                    if (type.includes('USE') || type === 'RESET') return 'text-red-500';
+                    return 'text-blue-500';
+                };
+
+                const filteredMembers = computed(() => {
+                    if (!searchTerm.value) return members.value;
+                    const s = searchTerm.value.toLowerCase();
+                    return members.value.filter(m => m.name?.toLowerCase().includes(s) || m.phone?.includes(s));
+                });
+
+                const sortedHistory = computed(() => {
+                    if (!showDetailModal.value?.history) return [];
+                    return [...showDetailModal.value.history].reverse();
+                });
+
+                watch([activeTab, showDetailModal, deleteConfirmation, filteredMembers, isAuthorized], () => {
+                    nextTick(() => lucide.createIcons());
+                });
+
+                onMounted(() => {
+                    window.addEventListener('online', () => isOnline.value = true);
+                    window.addEventListener('offline', () => isOnline.value = false);
+
+                    onAuthStateChanged(auth, async (u) => {
+                        if (!u) {
+                            await signInAnonymously(auth);
+                        } else {
+                            user.value = u;
+                            const membersRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                            onSnapshot(query(membersRef), (snap) => {
+                                members.value = snap.docs.map(doc => ({ 
+                                    id: doc.id, ...doc.data(), isPending: snap.metadata.hasPendingWrites 
+                                }));
+                                loading.value = false;
+                                checkCycles();
+                            });
+                        }
+                    });
+                });
+
+                const checkCycles = async () => {
+                    const now = new Date();
+                    members.value.forEach(async m => {
+                        const days = Math.floor((now - new Date(m.lastResetDate)) / (1000 * 60 * 60 * 24));
+                        if (days >= CYCLE_DAYS) {
+                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id);
+                            await updateDoc(ref, {
+                                spendingLast30Days: 0, points: 0, lastResetDate: now.toISOString(),
+                                history: [...(m.history || []), {
+                                    date: now.toISOString(), type: 'RESET', 
+                                    description: `Hệ thống tự động reset chu kỳ 30 ngày. Điểm cũ: ${m.points?.toLocaleString()}đ`, amount: 0
+                                }]
+                            });
+                        }
+                    });
+                };
+
+                const handleSubmitMember = async () => {
+                    const isDuplicate = members.value.some(m => m.phone === formData.value.phone && m.id !== editingMember.value?.id);
+                    if (isDuplicate) return notify("Số điện thoại này đã có trên hệ thống!", "error");
+
+                    const ref_members = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                    const now = new Date().toISOString();
+                    
+                    try {
+                        if (editingMember.value) {
+                            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.value.id);
+                            await updateDoc(ref, {
+                                ...formData.value,
+                                history: [...(editingMember.value.history || []), { date: now, type: 'EDIT', description: 'Cập nhật thông tin', amount: 0 }]
+                            });
+                            notify("Đã cập nhật dữ liệu");
+                        } else {
+                            await addDoc(ref_members, {
+                                name: formData.value.name,
+                                phone: formData.value.phone,
+                                totalSpending: 0, spendingLast30Days: 0, points: 0,
+                                joinDate: now, lastResetDate: now, lastVisitDate: now,
+                                history: [{ date: now, type: 'REGISTER', description: 'Đăng ký mới', amount: 0 }]
+                            });
+                            notify("Đăng ký thành viên thành công");
+                        }
+                        activeTab.value = 'list';
+                        editingMember.value = null;
+                        formData.value = {name: '', phone: ''};
+                    } catch (e) {
+                        notify("Lỗi lưu dữ liệu", "error");
+                    }
+                };
+
+                const editMember = (m) => {
+                    editingMember.value = m;
+                    formData.value = { name: m.name, phone: m.phone };
+                    activeTab.value = 'add';
+                };
+
+                const confirmDelete = async () => {
+                    if (!deleteConfirmation.value) return;
+                    try {
+                        const targetId = deleteConfirmation.value.id;
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'members', targetId);
+                        await deleteDoc(ref);
+                        deleteConfirmation.value = null;
+                        notify("Đã xóa dữ liệu vĩnh viễn", "error");
+                    } catch (e) {
+                        notify("Không thể xóa. Thử lại sau.", "error");
+                    }
+                };
+
+                const handleTransaction = async () => {
+                    if (!selectedMember.value || !billAmount.value) return;
+                    const tier = getTierConfig(selectedMember.value.spendingLast30Days);
+                    const ptsUsed = usePoints.value ? Math.min(selectedMember.value.points, billAmount.value) : 0;
+                    const ptsEarned = Math.round(billAmount.value * tier.cashback);
+                    const now = new Date().toISOString();
+
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'members', selectedMember.value.id);
+                    await updateDoc(ref, {
+                        totalSpending: (selectedMember.value.totalSpending || 0) + billAmount.value,
+                        spendingLast30Days: (selectedMember.value.spendingLast30Days || 0) + billAmount.value,
+                        points: (selectedMember.value.points || 0) - ptsUsed + ptsEarned,
+                        lastVisitDate: now,
+                        history: [...(selectedMember.value.history || []), 
+                            { date: now, type: 'USE', description: `Dùng điểm bill ${billAmount.value.toLocaleString()}đ`, amount: -ptsUsed },
+                            { date: now, type: 'EARN', description: `Tích điểm bill ${billAmount.value.toLocaleString()}đ`, amount: ptsEarned }
+                        ]
+                    });
+
+                    notify(`Thanh toán thành công! +${ptsEarned.toLocaleString()}đ`);
+                    billAmount.value = null; usePoints.value = false; selectedMember.value = null;
+                    activeTab.value = 'list';
+                };
+
+                const handleAdjustPoints = async () => {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'members', showDetailModal.value.id);
+                    const val = parseInt(adjustPointsValue.value);
+                    const now = new Date().toISOString();
+                    const newPts = Math.max(0, (showDetailModal.value.points || 0) + val);
+
+                    const log = { date: now, type: 'ADJUST', description: adjustPointsReason.value || 'Điều chỉnh thủ công', amount: val };
+                    await updateDoc(ref, { points: newPts, history: [...(showDetailModal.value.history || []), log] });
+                    
+                    showDetailModal.value.points = newPts;
+                    showDetailModal.value.history.push(log);
+                    adjustPointsValue.value = null; adjustPointsReason.value = '';
+                    notify("Đã cập nhật điểm");
+                };
+
+                const exportToCSV = () => {
+                    const header = "Họ tên,SĐT,Hạng,Điểm,Tiêu 30 ngày,Tổng tiêu,Lần cuối,Tham gia\n";
+                    const rows = members.value.map(m => 
+                        `${m.name},'${m.phone},${getTierConfig(m.spendingLast30Days).name},${m.points},${m.spendingLast30Days},${m.totalSpending},${m.lastVisitDate},${m.joinDate}`
+                    ).join("\n");
+                    const blob = new Blob(["\uFEFF" + header + rows], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `Bo888_Backup_${new Date().toLocaleDateString().replace(/\//g,'-')}.csv`;
+                    link.click();
+                };
+
+                const handleImportCSV = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                        const lines = ev.target.result.split('\n').slice(1);
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            const cols = line.split(',');
+                            if (cols.length < 2) continue;
+                            const phone = cols[1].replace(/'/g, '').trim();
+                            const existing = members.value.find(m => m.phone === phone);
+                            const data = {
+                                name: cols[0], phone, points: parseInt(cols[3]) || 0,
+                                spendingLast30Days: parseInt(cols[4]) || 0, totalSpending: parseInt(cols[5]) || 0,
+                                lastVisitDate: cols[6] || new Date().toISOString(), joinDate: cols[7] || new Date().toISOString(), lastResetDate: new Date().toISOString(),
+                                history: [{ date: new Date().toISOString(), type: 'IMPORT', description: 'Khôi phục từ file', amount: 0 }]
+                            };
+                            if (existing) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', existing.id), data);
+                            else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), data);
+                        }
+                        notify("Đã nhập dữ liệu thành công");
+                    };
+                    reader.readAsText(file);
+                };
+
+                return {
+                    appId, activeTab, searchTerm, members, filteredMembers, loading, isOnline,
+                    formData, editingMember, selectedMember, showDetailModal, deleteConfirmation, notification,
+                    billAmount, usePoints, adjustPointsValue, adjustPointsReason, sortedHistory,
+                    isAuthorized, loginPassword, loginError, checkLogin, logout,
+                    getTierConfig, getDaysSinceLastVisit, getDaysRemaining, formatCurrency, formatDateShort, getLogColor,
+                    handleSubmitMember, editMember, confirmDelete, handleTransaction, handleAdjustPoints, exportToCSV, handleImportCSV,
+                    openAddTab: () => { editingMember.value = null; formData.value = {name:'', phone:''}; activeTab.value = 'add'; },
+                    showDetail: (m) => { showDetailModal.value = m; }
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
